@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: eks-helm-demo
+
+  source:
+    # Point directly at the upstream Helm chart repo — no need to copy it into your repo
+    repoURL: "https://prometheus-community.github.io/helm-charts"
+    chart: kube-prometheus-stack
+    targetRevision: "57.2.0"
+
+    helm:
+      releaseName: kube-prometheus-stack
+      valueFiles:
+        - $values/helm/monitoring/values.yaml   # pulls values from your Git repo (see below)
+
+  # Second source: your Git repo for values overrides
+  sources:
+    - repoURL: "https://github.com/idan5353/ArgoCDHelmProject.git"
+      targetRevision: main
+      ref: values   # referenced as $values above
+
+    - repoURL: "https://prometheus-community.github.io/helm-charts"
+      chart: kube-prometheus-stack
+      targetRevision: "57.2.0"
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/helm/monitoring/values.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - Replace=true   # needed for large CRDs like Prometheus rules

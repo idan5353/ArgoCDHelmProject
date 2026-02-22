@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: eks-helm-demo
+  namespace: argocd
+spec:
+  description: "EKS Helm Demo project"
+
+  # Only allow deployments from your Git repo
+  sourceRepos:
+    - "https://github.com/idan5353/ArgoCDHelmProject.git"
+
+  # Allow deploying to any namespace in the local cluster
+  destinations:
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+
+  # Allow all core Kubernetes resources
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

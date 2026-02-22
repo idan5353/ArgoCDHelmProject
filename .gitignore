@@ -1,0 +1,71 @@
+# ── Terraform ────────────────────────────────────────────────────────
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfstate.d/
+*.tfplan
+*.tfvars
+!example.tfvars        # keep example vars file for reference
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+crash.log
+crash.*.log
+
+# ── Sensitive / Secrets ──────────────────────────────────────────────
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+secrets/
+kubeconfig
+kubeconfig.*
+*-kubeconfig.yaml
+
+# ── Helm ─────────────────────────────────────────────────────────────
+*.tgz
+charts/
+helm/*/charts/
+helm/*/Chart.lock
+
+# ── AWS ──────────────────────────────────────────────────────────────
+.aws/
+aws-exports.js
+
+# ── OS ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE / Editors ────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Node.js (if app is Node) ─────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+dist/
+build/
+
+# ── Python (if app is Python) ────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ── Docker ───────────────────────────────────────────────────────────
+*.tar
+
+# ── Logs ─────────────────────────────────────────────────────────────
+*.log
+logs/

@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: my-app-dev
+  namespace: argocd
+  # Auto-delete child resources when this Application is deleted
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: eks-helm-demo
+
+  source:
+    repoURL: "https://github.com/idan5353/ArgoCDHelmProject.git"
+    targetRevision: main
+    path: helm/my-app
+
+    helm:
+      # Use the dev-specific values override
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: my-app-dev
+
+  syncPolicy:
+    automated:
+      prune: true      # delete resources removed from Git
+      selfHeal: true   # revert manual kubectl changes
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

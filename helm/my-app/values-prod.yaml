@@ -1,0 +1,11 @@
+replicaCount: 3
+
+hpa:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+
+ingress:
+  annotations:
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:ACCOUNT:certificate/CERT_ID"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'

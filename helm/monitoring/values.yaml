@@ -1,0 +1,73 @@
+# ── Grafana ──────────────────────────────────────────────────────────
+grafana:
+  enabled: true
+  adminPassword: "admin123"   # move to AWS Secrets Manager for prod
+
+  service:
+    type: LoadBalancer   # exposes Grafana UI via ALB
+
+  persistence:
+    enabled: true
+    size: 5Gi
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          folder: "EKS"
+          type: file
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  # Pre-load useful EKS dashboards
+  dashboards:
+    default:
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      node-exporter:
+        gnetId: 1860
+        revision: 37
+        datasource: Prometheus
+
+# ── Prometheus ───────────────────────────────────────────────────────
+prometheus:
+  enabled: true
+  prometheusSpec:
+    retention: 7d
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+# ── Alertmanager ─────────────────────────────────────────────────────
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+# ── Node Exporter ────────────────────────────────────────────────────
+nodeExporter:
+  enabled: true   # scrapes CPU/memory/disk from every EKS node
+
+# ── Kube State Metrics ───────────────────────────────────────────────
+kubeStateMetrics:
+  enabled: true   # scrapes pod/deployment/node state from K8s API
