@@ -3,7 +3,7 @@ replicaCount: 2
 image:
   repository: 851725642392.dkr.ecr.us-east-1.amazonaws.com/my-app
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "8ee03de"
 
 service:
   type: ClusterIP
