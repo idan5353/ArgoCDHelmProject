@@ -50,7 +50,6 @@ text
 ### 1. Infrastructure (One-Time Setup)
 Terraform provisions the entire AWS infrastructure in two stages:
 
-```bash
 # Stage 1 — VPC + EKS cluster + IRSA
 cd terraform/1-infra
 terraform init && terraform apply
