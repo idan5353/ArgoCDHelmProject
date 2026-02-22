@@ -1,0 +1,130 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'           # only trigger when app code changes
+      - 'helm/my-app/**'   # or when helm chart changes
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 851725642392.dkr.ecr.us-east-1.amazonaws.com
+  ECR_REPOSITORY: my-app
+  HELM_VALUES_FILE: helm/my-app/values.yaml
+
+jobs:
+  # ── Job 1: Build and Push Docker Image to ECR ──────────────────────
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Generate image tag
+        id: meta
+        run: |
+          # Use short git SHA as image tag for traceability
+          TAG=$(echo ${{ github.sha }} | cut -c1-7)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Image tag: $TAG"
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.tag }} \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            ./app
+
+      - name: Push to ECR
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:${{ steps.meta.outputs.tag }}
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # ── Job 2: Update Helm values.yaml with new image tag ──────────────
+  update-helm:
+    name: Update Helm Chart Tag
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update image tag in values.yaml
+        run: |
+          sed -i "s|tag:.*|tag: \"${{ needs.build-and-push.outputs.image_tag }}\"|" \
+            ${{ env.HELM_VALUES_FILE }}
+
+          cat ${{ env.HELM_VALUES_FILE }}   # print to verify change
+
+      - name: Commit and push updated values.yaml
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ${{ env.HELM_VALUES_FILE }}
+          git commit -m "ci: update image tag to ${{ needs.build-and-push.outputs.image_tag }} [skip ci]"
+          git push
+
+  # ── Job 3: Trigger ArgoCD Sync ─────────────────────────────────────
+  sync-argocd:
+    name: Sync ArgoCD
+    runs-on: ubuntu-latest
+    needs: update-helm
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name eks-helm-demo-eks
+
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o argocd \
+            https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          chmod +x argocd
+          sudo mv argocd /usr/local/bin/
+
+      - name: Sync ArgoCD App
+        run: |
+          # Port-forward ArgoCD in background
+          kubectl port-forward svc/argocd-server -n argocd 8080:80 &
+          sleep 5
+
+          # Login to ArgoCD
+          argocd login localhost:8080 \
+            --username admin \
+            --password ${{ secrets.ARGOCD_PASSWORD }} \
+            --insecure
+
+          # Trigger sync
+          argocd app sync my-app-dev --prune
+
+          # Wait for it to be healthy
+          argocd app wait my-app-dev --health --timeout 120
