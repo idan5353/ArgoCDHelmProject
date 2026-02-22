@@ -86,7 +86,7 @@ jobs:
           git commit -m "ci: update image tag to ${{ needs.build-and-push.outputs.image_tag }} [skip ci]"
           git push
 
-  # ── Job 3: Trigger ArgoCD Sync ─────────────────────────────────────
+    # ── Job 3: Trigger ArgoCD Sync ─────────────────────────────────────
   sync-argocd:
     name: Sync ArgoCD
     runs-on: ubuntu-latest
@@ -106,27 +106,23 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --name eks-helm-demo-eks
 
-      - name: Install ArgoCD CLI
+      - name: Trigger ArgoCD sync via kubectl
         run: |
-          curl -sSL -o argocd \
-            https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-          chmod +x argocd
-          sudo mv argocd /usr/local/bin/
+          # Annotate the app to force a refresh — ArgoCD picks it up instantly
+          kubectl annotate application my-app-dev \
+            -n argocd \
+            argocd.argoproj.io/refresh=hard \
+            --overwrite
 
-      - name: Sync ArgoCD App
-        run: |
-          # Port-forward ArgoCD in background
-          kubectl port-forward svc/argocd-server -n argocd 8080:80 &
-          sleep 5
+          # Wait for sync to complete
+          kubectl wait application/my-app-dev \
+            -n argocd \
+            --for=jsonpath='{.status.sync.status}'=Synced \
+            --timeout=120s
 
-          # Login to ArgoCD
-          argocd login localhost:8080 \
-            --username admin \
-            --password ${{ secrets.ARGOCD_PASSWORD }} \
-            --insecure
+          # Wait for health
+          kubectl wait application/my-app-dev \
+            -n argocd \
+            --for=jsonpath='{.status.health.status}'=Healthy \
+            --timeout=120s
 
-          # Trigger sync
-          argocd app sync my-app-dev --prune
-
-          # Wait for it to be healthy
-          argocd app wait my-app-dev --health --timeout 120
